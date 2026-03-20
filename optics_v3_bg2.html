@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<title>Optics Ray Diagram</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#07090f;--surf:#0e1520;--bord:#1a2535;--text:#c0d0e8;--mut:#3a5068}
+html,body{background:var(--bg);color:var(--text);font-family:'Sora',sans-serif;width:100%;overflow-x:hidden;font-size:clamp(11px,1.8vw,15px)}
+/* Canvas full-bleed, no margins */
+#canvasWrap{width:100%;line-height:0;position:relative}
+canvas{display:block;width:100%;touch-action:auto;cursor:grab}
+canvas.sim-dragging{touch-action:none;cursor:grabbing}
+/* Drop zone overlay feedback */
+#dropOverlay{display:none;position:absolute;inset:0;border:3px dashed #3b82f6;border-radius:0;pointer-events:none;z-index:10;background:rgba(59,130,246,.06)}
+#dropLabel{display:none;position:absolute;inset:0;align-items:center;justify-content:center;font-size:1.1rem;color:#60a5fa;font-family:'Space Mono',monospace;pointer-events:none;z-index:11}
+/* All controls below */
+.controls{padding:10px 8px 30px;display:flex;flex-direction:column;gap:7px;align-items:center}
+.dev-row{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;width:100%;max-width:820px}
+.db{padding:5px 9px;border-radius:7px;border:1px solid var(--bord);background:var(--surf);color:var(--mut);cursor:pointer;font-size:.6rem;font-family:'Space Mono',monospace;transition:all .15s;white-space:nowrap}
+.db.on{background:rgba(59,130,246,.18);border-color:#3b82f6;color:#93c5fd}
+.ctrl-row{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%;max-width:820px}
+.ctrl{background:var(--surf);border:1px solid var(--bord);border-radius:9px;padding:9px 12px 8px}
+.ch{display:flex;justify-content:space-between;margin-bottom:5px}
+.cn{font-size:.6rem;color:var(--mut);font-family:'Space Mono',monospace}
+.cv{font-size:.88rem;font-weight:700;color:#60a5fa;font-family:'Space Mono',monospace}
+input[type=range]{width:100%;height:3px;appearance:none;background:var(--bord);border-radius:2px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:14px;height:14px;border-radius:50%;background:#3b82f6;cursor:pointer}
+.zoom-bar{display:flex;gap:5px;align-items:center;width:100%;max-width:820px;background:var(--surf);border:1px solid var(--bord);border-radius:9px;padding:7px 12px}
+.zb{width:30px;height:30px;border-radius:6px;border:1px solid var(--bord);background:#060b12;color:#93c5fd;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none}
+.zb:hover{border-color:#3b82f6}
+.zl{font-size:.6rem;color:var(--mut);font-family:'Space Mono',monospace;white-space:nowrap}
+.case-bar{background:rgba(251,191,36,.09);border:1px solid rgba(251,191,36,.28);border-radius:8px;padding:5px 12px;font-size:.67rem;color:#fbbf24;font-weight:600;text-align:center;font-family:'Space Mono',monospace;width:100%;max-width:820px}
+.info-row{display:flex;flex-wrap:wrap;gap:5px;width:100%;max-width:820px}
+.chip{padding:3px 9px;border-radius:20px;font-size:.63rem;border:1px solid var(--bord);background:var(--surf);font-family:'Space Mono',monospace}
+.chip b{color:#e0eaf8}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%;max-width:820px}
+.tool-box{background:var(--surf);border:1px solid var(--bord);border-radius:9px;padding:9px 11px}
+.tool-box h3{font-size:.58rem;color:#3b82f6;font-family:'Space Mono',monospace;margin-bottom:7px;text-transform:uppercase;letter-spacing:1px}
+.pr{display:flex;gap:5px;align-items:center;margin-bottom:5px}
+.pr label{font-size:.56rem;color:var(--mut);font-family:'Space Mono',monospace;white-space:nowrap}
+.pi{flex:1;background:#060b12;border:1px solid var(--bord);color:#93c5fd;font-size:.62rem;padding:4px 7px;border-radius:5px;outline:none;font-family:'Space Mono',monospace}
+.pi:focus{border-color:#3b82f6}
+.pi::placeholder{color:#2a3d5a}
+.ab{padding:4px 9px;border-radius:5px;border:1px solid #3b82f6;background:rgba(59,130,246,.15);color:#93c5fd;font-size:.6rem;cursor:pointer;font-family:'Space Mono',monospace;white-space:nowrap}
+.ab:hover{background:rgba(59,130,246,.3)}
+.fill-row{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.fb{padding:3px 7px;border-radius:5px;border:1px solid var(--bord);background:#060b12;color:#4a6080;font-size:.57rem;cursor:pointer;font-family:'Space Mono',monospace}
+.fb.on{border-color:#3b82f6;color:#93c5fd;background:rgba(59,130,246,.12)}
+.hint{font-size:.54rem;color:#253545;font-family:'Space Mono',monospace;margin-top:3px}
+.legend{display:flex;gap:9px;flex-wrap:wrap;justify-content:center;width:100%;max-width:820px}
+.leg{display:flex;align-items:center;gap:3px;font-size:.56rem;color:var(--mut);font-family:'Space Mono',monospace}
+.ll{width:16px;height:2px;border-radius:1px;flex-shrink:0}
+/* Background tool */
+.bg-tool-box{grid-column:1/-1}
+.bg-tabs{display:flex;gap:4px;margin-bottom:7px;flex-wrap:wrap}
+.bg-tab{padding:4px 9px;border-radius:6px;border:1px solid var(--bord);background:#060b12;color:#4a6080;font-size:.58rem;cursor:pointer;font-family:'Space Mono',monospace;touch-action:manipulation;transition:all .1s}
+.bg-tab.on{border-color:#3b82f6;color:#93c5fd;background:rgba(59,130,246,.14)}
+.bg-panel{animation:fadein .15s ease}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.grad-dir-row{display:flex;gap:4px;align-items:center;margin-bottom:5px;flex-wrap:wrap}
+.grad-colors{display:flex;flex-direction:column;gap:4px;max-height:112px;overflow-y:auto}
+.gc-row{display:flex;gap:5px;align-items:center}
+.gc-row input[type=color]{width:34px;height:26px;border:1px solid #1a2535;border-radius:5px;background:none;cursor:pointer;padding:1px}
+.gc-del{width:22px;height:22px;border-radius:4px;border:1px solid #2a3d5a;background:#060b12;color:#e05a5a;font-size:.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.gc-del:hover{background:#3a1010;border-color:#e05a5a}
+.preset-row{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
+.preset-sw{width:22px;height:22px;border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color .1s;flex-shrink:0}
+.preset-sw:hover{border-color:#93c5fd}
+.anim-grid{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px}
+.anim-btn{padding:4px 9px;border-radius:6px;border:1px solid var(--bord);background:#060b12;color:#4a6080;font-size:.58rem;cursor:pointer;font-family:'Space Mono',monospace;touch-action:manipulation;transition:all .1s}
+.anim-btn.on{border-color:#3b82f6;color:#93c5fd;background:rgba(59,130,246,.14)}
+/* Full-page background canvas */
+#bgCanvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;pointer-events:none;display:none}
+</style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+
+<div id="canvasWrap">
+  <canvas id="C" width="900" height="280"></canvas>
+  <div id="dropOverlay"></div>
+  <div id="dropLabel">📸 Drop inside = Object &nbsp;|&nbsp; Drop outside = Background</div>
+</div>
+
+<div class="controls">
+  <div class="dev-row" id="devRow">
+    <button class="db on" data-d="convex-lens">⊕ Convex Lens</button>
+    <button class="db" data-d="concave-lens">⊖ Concave Lens</button>
+    <button class="db" data-d="concave-mirror">⌒ Concave Mirror</button>
+    <button class="db" data-d="convex-mirror">⌣ Convex Mirror</button>
+    <button class="db" data-d="plane-mirror">| Plane Mirror</button>
+  </div>
+
+  <div class="ctrl-row">
+    <div class="ctrl">
+      <div class="ch"><span class="cn">Focal Length f</span><span class="cv" id="fVal">12.0 cm</span></div>
+      <input type="range" id="fSldr" min="4" max="22" value="12" step="0.5">
+    </div>
+    <div class="ctrl">
+      <div class="ch"><span class="cn">Object Distance u</span><span class="cv" id="uVal">22.0 cm</span></div>
+      <input type="range" id="uSldr" min="2" max="42" value="22" step="0.5">
+    </div>
+  </div>
+
+  <div class="zoom-bar">
+    <span class="zl">Scene Zoom ±</span>
+    <button class="zb" id="zmOut">−</button>
+    <input type="range" id="zoomSldr" min="4" max="20" value="9" step="0.5" style="flex:1">
+    <button class="zb" id="zmIn">+</button>
+    <span class="zl" id="zoomLbl">9 px/cm</span>
+    <span class="zl" style="margin-left:8px;color:#1e3050">│</span>
+    <span class="zl" style="margin-left:8px">Pinch = Page Zoom</span>
+  </div>
+
+  <div class="case-bar" id="caseBan">—</div>
+  <div class="info-row" id="infoRow"></div>
+
+  <div class="legend">
+    <div class="leg"><div class="ll" style="background:#22d3ee"></div>Parallel ray</div>
+    <div class="leg"><div class="ll" style="background:#facc15"></div>Centre ray</div>
+    <div class="leg"><div class="ll" style="background:#4ade80"></div>Focal ray</div>
+    <div class="leg"><div class="ll" style="border-top:2px dashed #a78bfa;background:none"></div>Virtual ext.</div>
+    <div class="leg"><div class="ll" style="background:#f472b6"></div>Image</div>
+  </div>
+
+  <div class="tools">
+    <div class="tool-box">
+      <h3>🖼 Object</h3>
+      <div class="pr">
+        <label>URL/Text:</label>
+        <input class="pi" id="objIn" type="text" placeholder="URL or type A, ★, F, ...">
+        <button class="ab" id="objApply">Set</button>
+      </div>
+      <div class="hint">• URL → image &nbsp;• Single char/word → drawn as symbol<br>• Drag image file onto canvas = object</div>
+    </div>
+    <div class="tool-box bg-tool-box">
+      <h3>🎨 Background</h3>
+      <!-- Mode tabs -->
+      <div class="bg-tabs">
+        <button class="bg-tab on" data-bm="image">Image/URL</button>
+        <button class="bg-tab" data-bm="solid">Solid</button>
+        <button class="bg-tab" data-bm="gradient">Gradient</button>
+        <button class="bg-tab" data-bm="animated">Animated</button>
+      </div>
+      <!-- Image panel -->
+      <div class="bg-panel" id="bgp-image">
+        <div class="pr">
+          <label>URL:</label>
+          <input class="pi" id="bgIn" type="text" placeholder="https://...">
+          <button class="ab" id="bgApply">Set</button>
+        </div>
+        <div class="fill-row">
+          <div class="fb on" data-f="cover">Cover</div>
+          <div class="fb" data-f="contain">Contain</div>
+          <div class="fb" data-f="repeat">Repeat</div>
+          <div class="fb" data-f="stretch">Stretch</div>
+          <div class="fb" data-f="center">Center</div>
+        </div>
+        <div class="hint">Drag image outside canvas = background</div>
+      </div>
+      <!-- Solid panel -->
+      <div class="bg-panel" id="bgp-solid" style="display:none">
+        <div class="pr" style="gap:6px;align-items:center">
+          <label>Color:</label>
+          <input type="color" id="solidColor" value="#07090f" style="width:38px;height:28px;border:1px solid #1a2535;border-radius:5px;background:none;cursor:pointer;padding:1px">
+          <button class="ab" id="solidApply">Apply</button>
+        </div>
+        <div class="preset-row" id="solidPresets"></div>
+      </div>
+      <!-- Gradient panel -->
+      <div class="bg-panel" id="bgp-gradient" style="display:none">
+        <div class="grad-dir-row">
+          <span class="hint" style="margin:0">Direction:</span>
+          <button class="fb on" data-dir="to bottom">↓</button>
+          <button class="fb" data-dir="to right">→</button>
+          <button class="fb" data-dir="135deg">↘</button>
+          <button class="fb" data-dir="to top right">↗</button>
+          <button class="fb" data-dir="radial">◎</button>
+        </div>
+        <div class="hint" style="margin:4px 0 4px">Colors (2–4):</div>
+        <div class="grad-colors" id="gradColors">
+          <div class="gc-row"><input type="color" class="gc" value="#0d1b4f"><button class="gc-del" title="Remove">×</button></div>
+          <div class="gc-row"><input type="color" class="gc" value="#1a4a8a"><button class="gc-del" title="Remove">×</button></div>
+        </div>
+        <div style="display:flex;gap:5px;margin-top:5px">
+          <button class="ab" id="gradAdd">+ Add Color</button>
+          <button class="ab" id="gradApply">Apply</button>
+        </div>
+        <div class="preset-row" id="gradPresets"></div>
+      </div>
+      <!-- Animated panel -->
+      <div class="bg-panel" id="bgp-animated" style="display:none">
+        <div class="hint" style="margin-bottom:5px">Animated gradient pattern:</div>
+        <div class="anim-grid" id="animGrid"></div>
+        <div class="hint" style="margin-top:4px">Colors (2–4):</div>
+        <div class="grad-colors" id="animColors">
+          <div class="gc-row"><input type="color" class="gc" value="#6d28d9"><button class="gc-del" title="Remove">×</button></div>
+          <div class="gc-row"><input type="color" class="gc" value="#0ea5e9"><button class="gc-del" title="Remove">×</button></div>
+          <div class="gc-row"><input type="color" class="gc" value="#10b981"><button class="gc-del" title="Remove">×</button></div>
+        </div>
+        <div style="display:flex;gap:5px;margin-top:5px">
+          <button class="ab" id="animAdd">+ Add Color</button>
+          <button class="ab" id="animApply">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// CANVAS SETUP
+// ═══════════════════════════════════════════════════
+const CV = document.getElementById('C');
+const ctx = CV.getContext('2d');
+const CW = 900, CH = 280;
+
+// Full-page background canvas setup
+const BCV = document.getElementById('bgCanvas');
+const bctx = BCV.getContext('2d');
+function resizeBgCanvas() {
+  BCV.width = window.innerWidth;
+  BCV.height = window.innerHeight;
+}
+resizeBgCanvas();
+window.addEventListener('resize', resizeBgCanvas);
+
+let device = 'convex-lens';
+let f = 12, u = 22, SC = 9; // SC = px per cm
+let animT = 0;
+
+// Object: can be image element, or text string
+let objImg = null;   // HTMLImageElement
+let objText = null;  // string (symbol/letter)
+
+let bgImg = null;
+let bgFill = 'cover';
+// Extended background state
+let bgMode = 'image';      // 'image' | 'solid' | 'gradient' | 'animated'
+let bgSolid = '#07090f';
+let bgGradColors = ['#0d1b4f','#1a4a8a'];
+let bgGradDir = 'to bottom';
+let bgAnimColors = ['#6d28d9','#0ea5e9','#10b981'];
+let bgAnimType = 'orbs';   // 'orbs'|'wave'|'mesh'|'aurora'|'spiral'
+let bgAnimPhase = 0;
+
+const OX = CW * 0.5;  // optic centre x
+const AY = CH * 0.50;  // principal axis y
+const OH = 58;          // object height px
+
+// ═══════════════════════════════════════════════════
+// PHYSICS
+// ═══════════════════════════════════════════════════
+function compute() {
+  if (device === 'plane-mirror') return { v: u, m: 1, real: false, virtual: true, inf: false };
+  const fe = { 'convex-lens': f, 'concave-lens': -f, 'concave-mirror': f, 'convex-mirror': -f }[device];
+  const conv = device === 'convex-lens' || device === 'concave-mirror';
+  if (conv && Math.abs(u - f) < 0.2) return { v: 1e9, m: 0, real: false, virtual: false, inf: true };
+  const v = (u * fe) / (u - fe);
+  const m = -v / u;
+  return { v, m, real: v > 0, virtual: v <= 0, inf: false };
+}
+
+function caseText() {
+  const img = compute();
+  const nm = { 'convex-lens': 'Convex Lens', 'concave-lens': 'Concave Lens', 'concave-mirror': 'Concave Mirror', 'convex-mirror': 'Convex Mirror', 'plane-mirror': 'Plane Mirror' }[device];
+  if (img.inf) return `[${nm}]  u = F  →  Image at ∞`;
+  if (device === 'plane-mirror') return `[Plane Mirror]  Virtual · Erect · Same Size · Behind mirror`;
+  if (device === 'convex-mirror' || device === 'concave-lens') return `[${nm}]  Always Virtual · Erect · Diminished  |m| = ${Math.abs(img.m).toFixed(2)}`;
+  const nat = img.real ? 'Real · Inverted' : 'Virtual · Erect';
+  const am = Math.abs(img.m);
+  const sz = am > 1.08 ? `Magnified (${am.toFixed(2)}×)` : am < 0.92 ? `Diminished (${am.toFixed(2)}×)` : 'Same Size';
+  return `[${nm}]  ${nat} · ${sz}`;
+}
+
+// ═══════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════
+function aHead(x, y, dx, dy, s) {
+  s = s || 7; const l = Math.hypot(dx, dy); if (l < .01) return;
+  const ux = dx / l, uy = dy / l;
+  ctx.beginPath();
+  ctx.moveTo(x + ux * s, y + uy * s);
+  ctx.lineTo(x - uy * .6 * s - ux * s, y + ux * .6 * s - uy * s);
+  ctx.lineTo(x + uy * .6 * s - ux * s, y - ux * .6 * s - uy * s);
+  ctx.closePath(); ctx.fill();
+}
+function seg(x1, y1, x2, y2, arr) {
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  if (arr) { ctx.save(); ctx.fillStyle = ctx.strokeStyle; aHead((x1 + x2) / 2, (y1 + y2) / 2, x2 - x1, y2 - y1, 5); ctx.restore(); }
+}
+function dSeg(x1, y1, x2, y2) {
+  ctx.save(); ctx.setLineDash([5, 4]); ctx.globalAlpha *= 0.62;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.restore();
+}
+function toEdge(x, y, dx, dy) {
+  let t = 1e9;
+  if (dx > 0.001) t = Math.min(t, (CW - x) / dx);
+  else if (dx < -0.001) t = Math.min(t, -x / dx);
+  if (dy > 0.001) t = Math.min(t, (CH - y) / dy);
+  else if (dy < -0.001) t = Math.min(t, -y / dy);
+  if (t <= 0 || t > 5000) return;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + dx * t, y + dy * t); ctx.stroke();
+}
+function dToEdge(x, y, dx, dy) {
+  ctx.save(); ctx.setLineDash([5, 4]); ctx.globalAlpha *= 0.5; toEdge(x, y, dx, dy); ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════
+// DRAW REPRESENTATION (object or image)
+// baseY = foot on axis, h = height px (+ = upward)
+// flipped     = upside-down (inverted real images)
+// al          = opacity
+// lateralFlip = mirror left↔right (always true when flipped; also true for plane-mirror image)
+// ═══════════════════════════════════════════════════
+function drawRep(x, baseY, h, flipped, al, lateralFlip) {
+  const absH = Math.abs(h);
+  ctx.save();
+  ctx.globalAlpha = (ctx.globalAlpha || 1) * al;
+
+  if (objImg) {
+    const ar = objImg.naturalWidth / objImg.naturalHeight;
+    const iw = absH * ar;
+    const cy = flipped ? baseY + absH / 2 : baseY - absH / 2;
+    ctx.save();
+    ctx.translate(x, cy);
+    // Vertical flip AND lateral flip when inverted; lateral-only for plane mirror
+    if (flipped)          ctx.scale(-1, -1);   // inverted → flip both axes
+    else if (lateralFlip) ctx.scale(-1,  1);   // plane mirror → lateral only
+    ctx.drawImage(objImg, -iw / 2, -absH / 2, iw, absH);
+    ctx.restore();
+
+  } else if (objText) {
+    const tipY = flipped ? baseY + absH : baseY - absH;
+    const cy = (baseY + tipY) / 2;
+    const fs = Math.max(10, absH * 0.78);
+    ctx.save();
+    ctx.translate(x, cy);
+    if (flipped)          ctx.scale(-1, -1);
+    else if (lateralFlip) ctx.scale(-1,  1);
+    ctx.font = `900 ${fs}px Georgia, serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fcd34d';
+    ctx.shadowColor = 'rgba(252,211,77,.4)';
+    ctx.shadowBlur = 8;
+    ctx.fillText(objText, 0, 0);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+  } else {
+    // Default: arrow (arrows look the same laterally, so only vertical matters)
+    const tipY = flipped ? baseY + absH : baseY - absH;
+    ctx.strokeStyle = '#fcd34d'; ctx.fillStyle = '#fcd34d'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x, baseY); ctx.lineTo(x, tipY); ctx.stroke();
+    aHead(x, tipY, 0, flipped ? 1 : -1, 9);
+    ctx.fillStyle = 'rgba(252,211,77,.3)';
+    ctx.beginPath(); ctx.arc(x, baseY, 4, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════
+// BACKGROUND ENGINE
+// ═══════════════════════════════════════════════════
+function applyPageBg(cssValue) {
+  // Apply to full page body AND behind canvas
+  document.body.style.background = cssValue;
+  document.documentElement.style.background = cssValue;
+}
+
+function drawBg() {
+  if (bgMode === 'image' || bgImg) {
+    if (bgImg) {
+      ctx.fillStyle = '#050810'; ctx.fillRect(0, 0, CW, CH);
+      const iw = bgImg.naturalWidth, ih = bgImg.naturalHeight;
+      if (!iw || !ih) { ctx.fillRect(0, 0, CW, CH); return; }
+      if (bgFill === 'cover') { const s = Math.max(CW / iw, CH / ih); ctx.drawImage(bgImg, (CW - iw * s) / 2, (CH - ih * s) / 2, iw * s, ih * s); }
+      else if (bgFill === 'contain') { const s = Math.min(CW / iw, CH / ih); ctx.drawImage(bgImg, (CW - iw * s) / 2, (CH - ih * s) / 2, iw * s, ih * s); }
+      else if (bgFill === 'stretch') ctx.drawImage(bgImg, 0, 0, CW, CH);
+      else if (bgFill === 'center') ctx.drawImage(bgImg, (CW - iw) / 2, (CH - ih) / 2);
+      else { try { const p = ctx.createPattern(bgImg, 'repeat'); ctx.fillStyle = p; ctx.fillRect(0, 0, CW, CH); } catch (e) { ctx.drawImage(bgImg, 0, 0, CW, CH); } }
+      ctx.fillStyle = 'rgba(5,8,18,.5)'; ctx.fillRect(0, 0, CW, CH);
+    } else {
+      ctx.fillStyle = '#050810'; ctx.fillRect(0, 0, CW, CH);
+    }
+    return;
+  }
+  if (bgMode === 'solid') {
+    ctx.fillStyle = bgSolid; ctx.fillRect(0, 0, CW, CH);
+    return;
+  }
+  if (bgMode === 'gradient') {
+    const cols = bgGradColors;
+    let grad;
+    if (bgGradDir === 'radial') {
+      grad = ctx.createRadialGradient(CW/2, CH/2, 0, CW/2, CH/2, Math.max(CW, CH)/1.4);
+    } else {
+      const a = bgGradDir === 'to bottom' ? [CW/2,0,CW/2,CH]
+              : bgGradDir === 'to right' ? [0,CH/2,CW,CH/2]
+              : bgGradDir === '135deg' ? [0,0,CW,CH]
+              : [CW,0,0,CH]; // to top right
+      grad = ctx.createLinearGradient(...a);
+    }
+    cols.forEach((c,i) => grad.addColorStop(i / Math.max(cols.length - 1, 1), c));
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, CW, CH);
+    return;
+  }
+  if (bgMode === 'animated') {
+    // Animated bg is on the full-page bgCanvas; sim canvas is transparent
+    ctx.fillStyle = 'rgba(0,0,0,0.0)';
+    ctx.clearRect(0, 0, CW, CH);
+    return;
+  }
+  ctx.fillStyle = '#050810'; ctx.fillRect(0, 0, CW, CH);
+}
+
+function hexToRgb(h) {
+  const r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16);
+  return [r,g,b];
+}
+function interpColors(cols, t) {
+  // t in [0,1], interpolate through cols
+  const n = cols.length;
+  const seg = t * (n - 1), i = Math.min(Math.floor(seg), n - 2), frac = seg - i;
+  const [r1,g1,b1] = hexToRgb(cols[i]), [r2,g2,b2] = hexToRgb(cols[i+1]);
+  return `rgb(${Math.round(r1+(r2-r1)*frac)},${Math.round(g1+(g2-g1)*frac)},${Math.round(b1+(b2-b1)*frac)})`;
+}
+
+function drawBgCanvas(t) {
+  if (bgMode !== 'animated') {
+    BCV.style.display = 'none';
+    return;
+  }
+  BCV.style.display = 'block';
+  const W = BCV.width, H = BCV.height;
+  drawAnimBg(bctx, W, H, t);
+}
+
+function drawAnimBg(c, W, H, t) {
+  const T = t * 0.001;
+  const cols = bgAnimColors;
+  c.fillStyle = `rgb(${hexToRgb(cols[0]).map(v=>Math.round(v*0.12)).join(',')})`;
+  c.fillRect(0, 0, W, H);
+
+  if (bgAnimType === 'orbs') {
+    // Floating radial orbs
+    c.globalCompositeOperation = 'screen';
+    const orbs = [
+      {x:0.2+0.15*Math.sin(T*0.7),    y:0.3+0.12*Math.cos(T*0.5),    r:0.45, ci:0},
+      {x:0.75+0.12*Math.cos(T*0.6),   y:0.25+0.1*Math.sin(T*0.8),    r:0.38, ci:1%cols.length},
+      {x:0.5+0.1*Math.sin(T*0.9+1),   y:0.7+0.1*Math.cos(T*0.6+2),   r:0.42, ci:2%cols.length},
+      {x:0.8+0.08*Math.cos(T*0.5+2),  y:0.75+0.1*Math.sin(T*0.7),    r:0.3,  ci:(cols.length>1?1:0)},
+    ];
+    orbs.forEach(o => {
+      const cx2=o.x*W, cy2=o.y*H, rad=o.r*Math.min(W,H);
+      const [r,g,b]=hexToRgb(cols[o.ci % cols.length]);
+      const g2=c.createRadialGradient(cx2,cy2,0,cx2,cy2,rad);
+      g2.addColorStop(0,`rgba(${r},${g},${b},0.7)`);
+      g2.addColorStop(0.5,`rgba(${r},${g},${b},0.3)`);
+      g2.addColorStop(1,`rgba(${r},${g},${b},0)`);
+      c.fillStyle=g2; c.beginPath(); c.arc(cx2,cy2,rad,0,Math.PI*2); c.fill();
+    });
+    c.globalCompositeOperation = 'source-over';
+
+  } else if (bgAnimType === 'wave') {
+    // Layered sine waves
+    for (let li = 0; li < cols.length; li++) {
+      const [r,g,b] = hexToRgb(cols[li]);
+      const phase = T + li * 1.2;
+      const amp = CH * (0.12 + li * 0.06);
+      const freq = 0.008 + li * 0.003;
+      const yBase = CH * (0.3 + li * 0.15);
+      c.beginPath();
+      c.moveTo(0, CH);
+      for (let x = 0; x <= CW; x += 4) {
+        const y = yBase + Math.sin(x * freq + phase) * amp + Math.sin(x * freq * 1.7 + phase * 1.3) * amp * 0.4;
+        c.lineTo(x, y);
+      }
+      c.lineTo(W, CH); c.lineTo(0, CH); c.closePath();
+      c.fillStyle = `rgba(${r},${g},${b},0.55)`; c.fill();
+    }
+
+  } else if (bgAnimType === 'mesh') {
+    // Animated mesh gradient (moving colour points)
+    const pts = cols.map((c,i) => {
+      const angle = (i / cols.length) * Math.PI * 2 + T * (0.3 + i * 0.1);
+      const rx = 0.35 * Math.cos(angle + Math.sin(T*0.4+i)*0.5);
+      const ry = 0.3 * Math.sin(angle + Math.cos(T*0.3+i)*0.4);
+      return {x:(0.5+rx)*W, y:(0.5+ry)*H, c};
+    });
+    // Nearest-colour blending via distance-weighted radial gradients
+    c.globalCompositeOperation = 'screen';
+    pts.forEach(p => {
+      const [r,g,b]=hexToRgb(p.c);
+      const rad = Math.max(W,H) * 0.75;
+      const gr = c.createRadialGradient(p.x,p.y,0,p.x,p.y,rad);
+      gr.addColorStop(0,`rgba(${r},${g},${b},0.75)`);
+      gr.addColorStop(1,`rgba(${r},${g},${b},0)`);
+      c.fillStyle=gr; c.fillRect(0,0,W,H);
+    });
+    c.globalCompositeOperation='source-over';
+
+  } else if (bgAnimType === 'aurora') {
+    // Horizontal aurora bands
+    c.fillStyle=`rgb(${hexToRgb(cols[0]).map(v=>Math.round(v*0.08)).join(',')})`;
+    c.fillRect(0,0,W,H);
+    for (let li = 0; li < Math.min(cols.length, 4); li++) {
+      const [r,g,b]=hexToRgb(cols[li % cols.length]);
+      const yCenter = CH*(0.25 + li*0.2 + 0.08*Math.sin(T*0.5+li*1.5));
+      const thick = CH*(0.12 + 0.06*Math.sin(T*0.8+li));
+      for (let x = 0; x < CW; x += 3) {
+        const wave = Math.sin(x*0.015 + T*(0.6+li*0.2) + li) * thick * 0.6;
+        const yc = yCenter + wave;
+        const g2 = c.createLinearGradient(x, yc-thick, x, yc+thick);
+        const al = 0.55 + 0.2*Math.sin(x*0.02+T+li);
+        g2.addColorStop(0,`rgba(${r},${g},${b},0)`);
+        g2.addColorStop(0.5,`rgba(${r},${g},${b},${al.toFixed(2)})`);
+        g2.addColorStop(1,`rgba(${r},${g},${b},0)`);
+        c.fillStyle=g2; c.fillRect(x,yc-thick,3,thick*2);
+      }
+    }
+
+  } else if (bgAnimType === 'spiral') {
+    // Rotating conic-like gradient approximated by arcs
+    const cx2=CW/2, cy2=CH/2, maxR=Math.max(W,H)*0.8;
+    const N = 120;
+    for (let i = 0; i < N; i++) {
+      const ang = (i/N)*Math.PI*2 + T*0.4;
+      const ang2 = ((i+1)/N)*Math.PI*2 + T*0.4;
+      const t2 = (i/N + T*0.1) % 1;
+      const col = interpColors(cols, t2);
+      c.beginPath();
+      c.moveTo(cx2, cy2);
+      c.arc(cx2, cy2, maxR, ang, ang2);
+      c.closePath();
+      c.fillStyle = col; c.fill();
+    }
+    // Soft centre vignette
+    const vg=c.createRadialGradient(cx2,cy2,0,cx2,cy2,maxR);
+    vg.addColorStop(0,'rgba(0,0,0,0.45)');vg.addColorStop(1,'rgba(0,0,0,0)');
+    c.fillStyle=vg; c.fillRect(0,0,W,H);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// NUMBER LINE
+// ═══════════════════════════════════════════════════
+function drawNumberLine() {
+  const ay = AY;
+  ctx.save();
+  // Axis
+  ctx.strokeStyle = 'rgba(150,190,255,.22)'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 5]);
+  ctx.beginPath(); ctx.moveTo(0, ay); ctx.lineTo(CW, ay); ctx.stroke();
+  ctx.setLineDash([]);
+  // Arrowheads on axis ends
+  ctx.fillStyle = 'rgba(150,190,255,.25)';
+  aHead(CW - 2, ay, 1, 0, 8); aHead(2, ay, -1, 0, 8);
+  ctx.fillStyle = 'rgba(80,110,160,.4)'; ctx.font = '7px Space Mono,monospace'; ctx.textAlign = 'left';
+  ctx.fillText('cm', CW - 26, ay + 16);
+
+  // Ticks and labels
+  const maxCm = Math.ceil(CW / SC / 2) + 2;
+  for (let cm = -maxCm; cm <= maxCm; cm++) {
+    if (cm === 0) continue;
+    const px = OX + cm * SC;
+    if (px < 4 || px > CW - 4) continue;
+    const label = cm % 2 === 0;
+    const big = cm % 10 === 0;
+    const tickH = big ? 9 : label ? 6 : 3;
+    ctx.strokeStyle = big ? 'rgba(180,200,230,.38)' : label ? 'rgba(120,150,180,.22)' : 'rgba(80,110,150,.12)';
+    ctx.lineWidth = big ? 1.5 : 1;
+    ctx.beginPath(); ctx.moveTo(px, ay - tickH); ctx.lineTo(px, ay + tickH); ctx.stroke();
+    if (label) {
+      ctx.fillStyle = big ? 'rgba(160,190,220,.6)' : 'rgba(100,140,175,.38)';
+      ctx.font = `${big ? 9 : 8}px Space Mono,monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(cm, px, ay + 20);
+    }
+  }
+  // 0 mark
+  ctx.strokeStyle = 'rgba(96,165,250,.55)'; ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.moveTo(OX, ay - 11); ctx.lineTo(OX, ay + 11); ctx.stroke();
+  ctx.fillStyle = 'rgba(96,165,250,.65)'; ctx.font = '9px Space Mono,monospace'; ctx.textAlign = 'center';
+  ctx.fillText('0', OX, ay + 20);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════
+// FOCAL MARKERS
+// ═══════════════════════════════════════════════════
+function mkr(px, lbl, col, dotted) {
+  if (px < 6 || px > CW - 6) return;
+  ctx.save();
+  if (dotted) { ctx.setLineDash([3, 3]); ctx.globalAlpha = 0.6; }
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.moveTo(px, AY - 15); ctx.lineTo(px, AY + 15); ctx.stroke();
+  // Label background
+  const tw = ctx.measureText(lbl).width + 6;
+  ctx.fillStyle = 'rgba(6,9,16,.7)';
+  ctx.fillRect(px - tw / 2, AY - 32, tw, 14);
+  ctx.fillStyle = col;
+  ctx.font = 'bold 10px Georgia, serif'; ctx.textAlign = 'center';
+  ctx.fillText(lbl, px, AY - 21);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════
+// LENS SHAPES
+// ═══════════════════════════════════════════════════
+function drawLensShape() {
+  const isConvex = device === 'convex-lens';
+  ctx.save();
+  ctx.shadowBlur = 16; ctx.shadowColor = 'rgba(96,165,250,.2)';
+
+  if (isConvex) {
+    // ── BICONVEX: () — both faces bow outward ──
+    const lh = 130, b = 28;
+    ctx.beginPath();
+    ctx.moveTo(OX, AY - lh / 2);
+    ctx.bezierCurveTo(OX + b, AY - lh / 4, OX + b, AY + lh / 4, OX, AY + lh / 2);
+    ctx.bezierCurveTo(OX - b, AY + lh / 4, OX - b, AY - lh / 4, OX, AY - lh / 2);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(80,155,255,.12)'; ctx.fill();
+    const gs = ctx.createLinearGradient(OX - 22, 0, OX + 22, 0);
+    gs.addColorStop(0, 'rgba(200,228,255,.16)'); gs.addColorStop(.5, 'rgba(80,155,255,.04)'); gs.addColorStop(1, 'rgba(200,228,255,.14)');
+    ctx.fillStyle = gs; ctx.fill();
+    ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#60a5fa';
+    aHead(OX, AY - lh / 2, 0, -1, 7); aHead(OX, AY + lh / 2, 0, 1, 7);
+
+  } else {
+    // ── BICONCAVE: hourglass — zero thickness at centre, thickest at flat ends ──
+    // edgeW = half-width at the flat top/bottom ends
+    // Both curved faces pass through exactly (OX, AY) — the optical centre
+    // Math: cubic bezier midpoint = OX requires ctrl_x = OX - edgeW/3 (i.e. pull = edgeW + edgeW/3 = 4*edgeW/3)
+    const lh = 130;
+    const edgeW = 26;       // half-width at ends
+    const half = lh / 2;
+
+    // Path:
+    // 1. Top flat edge (straight line left→right)
+    // 2. Right face curve: bows INWARD (left), passes through OX at centre
+    // 3. Bottom flat edge (straight line right→left)
+    // 4. Left face curve: bows INWARD (right), passes through OX at centre
+
+    ctx.beginPath();
+    ctx.moveTo(OX - edgeW, AY - half);
+    ctx.lineTo(OX + edgeW, AY - half);         // top flat edge
+    // Right curved face: ctrl pts pulled left past OX by edgeW/3
+    ctx.bezierCurveTo(OX - edgeW / 3, AY - half / 2,
+                      OX - edgeW / 3, AY + half / 2,
+                      OX + edgeW, AY + half);  // right face (inward bow → passes through OX)
+    ctx.lineTo(OX - edgeW, AY + half);         // bottom flat edge
+    // Left curved face: ctrl pts pulled right past OX by edgeW/3 (symmetric)
+    ctx.bezierCurveTo(OX + edgeW / 3, AY + half / 2,
+                      OX + edgeW / 3, AY - half / 2,
+                      OX - edgeW, AY - half);  // left face (inward bow → passes through OX)
+    ctx.closePath();
+
+    ctx.fillStyle = 'rgba(80,155,255,.10)'; ctx.fill();
+    const gs2 = ctx.createLinearGradient(OX - edgeW, 0, OX + edgeW, 0);
+    gs2.addColorStop(0, 'rgba(200,228,255,.18)');
+    gs2.addColorStop(.5, 'rgba(80,155,255,.04)');
+    gs2.addColorStop(1, 'rgba(200,228,255,.16)');
+    ctx.fillStyle = gs2; ctx.fill();
+    ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.shadowBlur = 0;
+    // No arrowheads for concave (ends are flat)
+  }
+
+  ctx.font = 'bold 10px Sora,sans-serif'; ctx.fillStyle = 'rgba(96,165,250,.75)'; ctx.textAlign = 'center';
+  ctx.fillText(isConvex ? 'Convex Lens' : 'Concave Lens', OX, 15);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════
+// MIRROR SHAPES
+// ═══════════════════════════════════════════════════
+function drawMirrorShape() {
+  const lh = 130, half = lh / 2;
+  const isConcave = device === 'concave-mirror', isPlane = device === 'plane-mirror';
+  // Concave mirror: opens toward the LEFT (reflects from the concave side)
+  // The mirror's reflective surface faces LEFT, curves backward to the right
+  const bx = isPlane ? 0 : isConcave ? 28 : -22;
+  ctx.save();
+  // Hatch (backing)
+  ctx.strokeStyle = 'rgba(100,125,155,.2)'; ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
+  for (let y = AY - half; y < AY + half; y += 9) {
+    ctx.beginPath(); ctx.moveTo(OX, y); ctx.lineTo(OX + 20, y + 7); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  // Backing (dark thick)
+  ctx.strokeStyle = 'rgba(18,28,44,.95)'; ctx.lineWidth = 11;
+  ctx.beginPath();
+  if (isPlane) { ctx.moveTo(OX + 5, AY - half); ctx.lineTo(OX + 5, AY + half); }
+  else {
+    ctx.moveTo(OX + 4, AY - half);
+    ctx.bezierCurveTo(OX + bx + 8, AY - half / 2, OX + bx + 8, AY + half / 2, OX + 4, AY + half);
+  }
+  ctx.stroke();
+  // Shiny face
+  const mg = ctx.createLinearGradient(OX - 10, 0, OX + 15, 0);
+  mg.addColorStop(0, '#c8d8e8'); mg.addColorStop(.25, '#f0f6fc'); mg.addColorStop(.65, '#98aebe'); mg.addColorStop(1, '#586878');
+  ctx.strokeStyle = mg; ctx.lineWidth = 7; ctx.shadowBlur = 6; ctx.shadowColor = 'rgba(200,225,255,.18)';
+  ctx.beginPath();
+  if (isPlane) { ctx.moveTo(OX, AY - half); ctx.lineTo(OX, AY + half); }
+  else {
+    ctx.moveTo(OX, AY - half);
+    ctx.bezierCurveTo(OX + bx, AY - half / 2, OX + bx, AY + half / 2, OX, AY + half);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  const nm = { 'concave-mirror': 'Concave Mirror', 'convex-mirror': 'Convex Mirror', 'plane-mirror': 'Plane Mirror' }[device];
+  ctx.fillStyle = 'rgba(148,163,184,.75)'; ctx.font = 'bold 10px Sora,sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(nm, OX + 20, 15);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════
+// DRAW IMAGE (real or virtual)
+// ═══════════════════════════════════════════════════
+function drawImage(img, imgX, imgTipY, isVirtual, lateralFlip) {
+  const al = isVirtual ? 0.3 : 1.0;
+  const absH = Math.abs(imgTipY - AY);
+  const flipped = img.m < 0; // real images of real objects are inverted
+  // When vertically flipped → also flip laterally (lateralFlip defaults to flipped)
+  const doLateral = lateralFlip !== undefined ? lateralFlip : flipped;
+
+  ctx.save();
+  if (objImg || objText) {
+    drawRep(imgX, AY, flipped ? absH : -absH, flipped, al, doLateral);
+  } else {
+    // Arrow representation
+    ctx.globalAlpha = al;
+    ctx.strokeStyle = isVirtual ? '#a78bfa' : '#f472b6';
+    ctx.fillStyle = isVirtual ? '#a78bfa' : '#f472b6';
+    ctx.lineWidth = 2.5;
+    if (isVirtual) ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(imgX, AY); ctx.lineTo(imgX, imgTipY); ctx.stroke();
+    ctx.setLineDash([]);
+    aHead(imgX, imgTipY, 0, img.m > 0 ? -1 : 1, 8);
+  }
+  ctx.globalAlpha = al * 0.85;
+  ctx.font = isVirtual ? 'italic 10px Sora,sans-serif' : '600 10px Sora,sans-serif';
+  ctx.fillStyle = isVirtual ? '#a78bfa' : '#f472b6';
+  ctx.textAlign = 'center';
+  ctx.fillText(isVirtual ? 'Virtual Image' : 'Image', imgX, AY + 28);
+  const am = Math.abs(img.m);
+  ctx.font = '8px Space Mono,monospace';
+  ctx.fillStyle = isVirtual ? 'rgba(167,139,250,.6)' : 'rgba(244,114,182,.7)';
+  ctx.fillText(`|m|=${am.toFixed(2)}  v=${img.v.toFixed(1)}cm`, imgX, AY + 39);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════
+// LENS RAYS — CONVEX
+// ═══════════════════════════════════════════════════
+function convexLensRays(img) {
+  const Fp = OX + f * SC;  // right focus (image side)
+  const Fo = OX - f * SC;  // left focus (object side)
+  const objX = OX - u * SC;
+  const objTipY = AY - OH;
+  const imgX = OX + img.v * SC;
+  const imgTipY = AY - img.m * OH;
+  const isReal = img.real;
+
+  // Ray 1: Parallel → bends through Fp
+  ctx.strokeStyle = '#22d3ee'; ctx.fillStyle = '#22d3ee'; ctx.lineWidth = 1.8;
+  seg(objX, objTipY, OX, objTipY, true);
+  if (isReal) {
+    seg(OX, objTipY, imgX, imgTipY, true);
+    toEdge(imgX, imgTipY, imgX - OX, imgTipY - objTipY);
+  } else {
+    // Virtual: diverges, backward ext to virtual img
+    toEdge(OX, objTipY, Fp - OX, AY - objTipY);
+    dSeg(OX, objTipY, imgX, imgTipY);
+  }
+
+  // Ray 2: Through centre, undeviated
+  ctx.strokeStyle = '#facc15'; ctx.fillStyle = '#facc15';
+  seg(objX, objTipY, OX, AY, true);
+  const dx2 = OX - objX, dy2 = AY - objTipY;
+  if (isReal) { seg(OX, AY, imgX, imgTipY, true); toEdge(imgX, imgTipY, dx2, dy2); }
+  else { toEdge(OX, AY, dx2, dy2); dSeg(OX, AY, imgX, imgTipY); }
+
+  // Ray 3: Aimed at Fo → exits parallel to right
+  ctx.strokeStyle = '#4ade80'; ctx.fillStyle = '#4ade80';
+  let r3y = AY;
+  if (Math.abs(Fo - objX) > 0.5) r3y = objTipY + (OX - objX) / (Fo - objX) * (AY - objTipY);
+  seg(objX, objTipY, OX, r3y, true);
+  if (isReal) { seg(OX, r3y, imgX, imgTipY, true); toEdge(imgX, imgTipY, 1, 0); }
+  else { toEdge(OX, r3y, 1, 0); dSeg(OX, r3y, imgX, imgTipY); }
+
+  if (imgX > 8 && imgX < CW - 8) drawImage(img, imgX, imgTipY, !isReal);
+}
+
+// ═══════════════════════════════════════════════════
+// LENS RAYS — CONCAVE (diverging, virtual image ALWAYS)
+// Object on left, rays refract and DIVERGE to the right.
+// Backward dashed extensions converge on LEFT = virtual image.
+// ═══════════════════════════════════════════════════
+function concaveLensRays(img) {
+  // f_eff = -f → v = u*(-f)/(u+f) < 0 always → virtual image on object side (left of lens)
+  const Fo = OX - f * SC;  // left focal point (F, object side)
+  const Fp = OX + f * SC;  // right focal point (F', image side) — used to aim Ray 3
+  const objX = OX - u * SC;
+  const objTipY = AY - OH;
+  // img.v < 0 → image is to LEFT of lens
+  const imgX = OX + img.v * SC;  // v negative → imgX < OX
+  const imgTipY = AY - img.m * OH;  // m positive → imgTipY < AY (upright)
+
+  // ── Ray 1: Parallel to axis → hits lens at (OX, objTipY)
+  // After concave lens: DIVERGES as if coming from Fo (left focus)
+  // Direction of refracted ray: from Fo through hit point (OX, objTipY), going RIGHT
+  ctx.strokeStyle = '#22d3ee'; ctx.fillStyle = '#22d3ee'; ctx.lineWidth = 1.8;
+  seg(objX, objTipY, OX, objTipY, true); // incident (horizontal)
+  // Refracted: direction from Fo(OX-f*SC, AY) toward (OX, objTipY), extended RIGHT
+  const r1dx = OX - Fo, r1dy = objTipY - AY; // direction: positive x, some y
+  toEdge(OX, objTipY, r1dx, r1dy); // refracted ray going right (diverging)
+  // Dashed backward (left) to virtual image: from (OX, objTipY) toward Fo direction
+  dSeg(OX, objTipY, imgX, imgTipY); // backward ext meets virtual image
+
+  // ── Ray 2: Through optical centre → undeviated straight through
+  ctx.strokeStyle = '#facc15'; ctx.fillStyle = '#facc15';
+  seg(objX, objTipY, OX, AY, true);
+  const dx2 = OX - objX, dy2 = AY - objTipY;
+  toEdge(OX, AY, dx2, dy2); // continues straight right
+  dSeg(OX, AY, imgX, imgTipY); // backward dashed to virtual img
+
+  // ── Ray 3: Aimed toward F' (right focus, OX+f*SC) → after concave lens exits PARALLEL
+  // This ray would go through F' but the lens bends it to emerge parallel
+  ctx.strokeStyle = '#4ade80'; ctx.fillStyle = '#4ade80';
+  // Find where this ray hits lens at x=OX
+  // Ray from (objX, objTipY) aimed at (Fp, AY)
+  let r3y = AY;
+  if (Math.abs(Fp - objX) > 0.5) r3y = objTipY + (OX - objX) / (Fp - objX) * (AY - objTipY);
+  seg(objX, objTipY, OX, r3y, true);
+  toEdge(OX, r3y, 1, 0); // exits horizontal (parallel to axis) going RIGHT
+  dSeg(OX, r3y, imgX, imgTipY); // backward dashed to virtual img
+
+  // Draw virtual image (30% opacity)
+  if (imgX > 8 && imgX < OX - 4) drawImage(img, imgX, imgTipY, true);
+}
+
+// ═══════════════════════════════════════════════════
+// MIRROR RAYS
+// ═══════════════════════════════════════════════════
+function mirrorRays(img) {
+  const isConcave = device === 'concave-mirror';
+  const Fx = OX - f * SC;   // focal point (front, left of mirror)
+  const FvX = OX + f * SC;  // virtual focal point (behind mirror, right)
+  const objX = OX - u * SC;
+  const objTipY = AY - OH;
+  // Real image: in front (left of mirror), v>0 → imgX = OX - v*SC
+  // Virtual image: behind mirror (right), v<0 → imgX = OX + |v|*SC = OX - v*SC (v<0)
+  const imgX = OX - img.v * SC;
+  const imgTipY = AY - img.m * OH;
+  const isReal = img.real;
+
+  // Ray 1: Parallel → reflects through Fx (concave) / as if from FvX (convex)
+  ctx.strokeStyle = '#22d3ee'; ctx.fillStyle = '#22d3ee'; ctx.lineWidth = 1.8;
+  seg(objX, objTipY, OX, objTipY, true);
+  if (isReal) {
+    seg(OX, objTipY, imgX, imgTipY, true);
+    toEdge(imgX, imgTipY, imgX - OX, imgTipY - objTipY);
+  } else {
+    // Convex: diverges, as if from FvX behind mirror
+    const rDx = OX - FvX, rDy = objTipY - AY; // direction from FvX toward hit (OX,objTipY)
+    toEdge(OX, objTipY, -rDx, rDy); // reflected going left (same direction extended)
+    dSeg(OX, objTipY, imgX, imgTipY);
+    dToEdge(OX, objTipY, rDx, -rDy); // behind mirror dashed
+  }
+
+  // Ray 2: Aimed at Fx → reflects parallel
+  ctx.strokeStyle = '#facc15'; ctx.fillStyle = '#facc15';
+  const targetF = isConcave ? Fx : FvX;
+  let r2y = AY;
+  if (Math.abs(targetF - objX) > 0.5) r2y = objTipY + (OX - objX) / (targetF - objX) * (AY - objTipY);
+  seg(objX, objTipY, OX, r2y, true);
+  if (isReal) { seg(OX, r2y, imgX, imgTipY, true); toEdge(imgX, imgTipY, -1, 0); }
+  else { toEdge(OX, r2y, -1, 0); dSeg(OX, r2y, imgX, imgTipY); dToEdge(OX, r2y, 1, 0); }
+
+  // Ray 3: To pole (OX,AY), reflects equal angle
+  ctx.strokeStyle = '#4ade80'; ctx.fillStyle = '#4ade80';
+  seg(objX, objTipY, OX, AY, true);
+  const rdx = -(OX - objX), rdy = AY - objTipY;
+  if (isReal) { seg(OX, AY, imgX, imgTipY, true); toEdge(imgX, imgTipY, rdx, rdy); }
+  else { toEdge(OX, AY, rdx, rdy); dSeg(OX, AY, imgX, imgTipY); dToEdge(OX, AY, -rdx, -rdy); }
+
+  const iB = isReal ? (imgX > 8 && imgX < OX - 4) : (imgX > OX + 4 && imgX < CW - 8);
+  if (iB) drawImage(img, imgX, imgTipY, !isReal);
+}
+
+// ═══════════════════════════════════════════════════
+// PLANE MIRROR RAYS
+// ═══════════════════════════════════════════════════
+function planeMirrorRays() {
+  const objX = OX - u * SC;
+  const objTipY = AY - OH;
+  const imgX = OX + u * SC; // virtual image, same distance behind mirror
+  const imgTipY = AY - OH;  // same height, erect
+
+  // Ray 1: horizontal from tip → hits mirror at (OX, objTipY) → reflects back left
+  ctx.strokeStyle = '#22d3ee'; ctx.fillStyle = '#22d3ee'; ctx.lineWidth = 1.8;
+  seg(objX, objTipY, OX, objTipY, true);   // incident
+  toEdge(OX, objTipY, -1, 0);              // reflected back left
+  dSeg(OX, objTipY, imgX, imgTipY);        // dashed extension behind mirror → virtual image tip
+  dToEdge(OX, objTipY, 1, 0);             // dashed behind mirror to right edge
+
+  // Ray 2: oblique from tip to pole (OX, AY) → reflects at equal angle
+  ctx.strokeStyle = '#facc15'; ctx.fillStyle = '#facc15';
+  seg(objX, objTipY, OX, AY, true);
+  // Reflected: x-component reverses
+  const rdx = -(OX - objX), rdy = AY - objTipY;
+  toEdge(OX, AY, rdx, rdy);               // reflected left
+  dSeg(OX, AY, imgX, AY);                 // dashed behind mirror → base of virtual image
+  dToEdge(OX, AY, -rdx, -rdy);           // dashed behind mirror in mirror direction
+
+  // Ray 3: from object base (foot) horizontal → hits mirror at axis → reflects back
+  ctx.strokeStyle = '#4ade80'; ctx.fillStyle = '#4ade80';
+  seg(objX, AY, OX, AY, true);
+  toEdge(OX, AY, -1, 0);
+  dSeg(OX, AY, imgX, AY);
+
+  // Virtual image: erect but laterally reversed (left↔right mirror flip only)
+  drawImage({ m: 1, real: false, virtual: true, v: u }, imgX, imgTipY, true, true);
+}
+
+// ═══════════════════════════════════════════════════
+// MAIN DRAW
+// ═══════════════════════════════════════════════════
+function draw(t) {
+  drawBg();
+  // Subtle vertical grid
+  ctx.strokeStyle = 'rgba(255,255,255,.016)'; ctx.lineWidth = 1;
+  const gs = OX % (SC * 5); for (let gx = gs >= 0 ? gs : gs + SC * 5; gx < CW; gx += SC * 5) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, CH); ctx.stroke(); }
+
+  drawNumberLine();
+
+  const isMirror = device.includes('mirror');
+  // Focal markers
+  if (device === 'concave-mirror') { mkr(OX - f * SC, 'F', '#f97316'); mkr(OX - 2 * f * SC, 'C', '#fbbf24'); }
+  else if (device === 'convex-mirror') { mkr(OX - f * SC, 'F', '#f97316', true); mkr(OX + f * SC, "F'(v)", '#f97316', true); mkr(OX - 2 * f * SC, 'C(v)', '#fbbf24', true); }
+  else if (device !== 'plane-mirror') {
+    mkr(OX - f * SC, 'F', '#f97316'); mkr(OX + f * SC, "F'", '#f97316');
+    mkr(OX - 2 * f * SC, '2F', '#fbbf24'); mkr(OX + 2 * f * SC, "2F'", '#fbbf24');
+    if (device === 'concave-lens') { mkr(OX - f * SC, 'F', '#f97316', true); mkr(OX + f * SC, "F'", '#f97316', true); }
+  }
+
+  // Optical element
+  if (isMirror) drawMirrorShape(); else drawLensShape();
+
+  const img = compute();
+
+  // Rays
+  if (img.inf) {
+    const objX = OX - u * SC, objTipY = AY - OH;
+    ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 1.8; seg(objX, objTipY, OX, objTipY, true); isMirror ? toEdge(OX, objTipY, -1, 0) : toEdge(OX, objTipY, 1, 0);
+    ctx.strokeStyle = '#facc15'; const sl = (AY - objTipY) / (OX - objX);
+    seg(objX, objTipY, OX, AY, true); isMirror ? toEdge(OX, AY, -1, -sl) : toEdge(OX, AY, 1, sl);
+    ctx.fillStyle = 'rgba(251,191,36,.85)'; ctx.font = '10px Space Mono,monospace'; ctx.textAlign = 'center';
+    ctx.fillText('Image at ∞', isMirror ? 80 : CW - 90, AY - 22);
+  } else {
+    if (device === 'plane-mirror') planeMirrorRays();
+    else if (device === 'concave-lens') concaveLensRays(img);
+    else if (isMirror) mirrorRays(img);
+    else convexLensRays(img);
+  }
+
+  // Object (drawn on top)
+  const objX = OX - u * SC, objTipY = AY - OH;
+  const og = ctx.createRadialGradient(objX, AY - OH / 2, 2, objX, AY - OH / 2, 30);
+  og.addColorStop(0, 'rgba(252,211,77,.18)'); og.addColorStop(1, 'rgba(252,211,77,0)');
+  ctx.fillStyle = og; ctx.beginPath(); ctx.arc(objX, AY - OH / 2, 30, 0, Math.PI * 2); ctx.fill();
+  drawRep(objX, AY, OH, false, 1.0);
+  ctx.fillStyle = '#fcd34d'; ctx.font = '10px Sora,sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('Object', objX, AY + 28);
+  ctx.fillStyle = 'rgba(252,211,77,.5)'; ctx.font = '8px Space Mono,monospace';
+  ctx.fillText(`u=${u.toFixed(1)}cm`, objX, AY + 39);
+
+  // Drag handles
+  function dot(px, py, col) { ctx.save(); ctx.strokeStyle = col; ctx.fillStyle = col + '25'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore(); }
+  dot(objX, AY, '#fcd34d');
+  if (device === 'concave-mirror') { dot(OX - f * SC, AY, '#f97316'); }
+  else if (!isMirror) { dot(OX - f * SC, AY, '#f97316'); dot(OX + f * SC, AY, '#f97316'); }
+}
+
+// ═══════════════════════════════════════════════════
+// ANIMATION
+// ═══════════════════════════════════════════════════
+function loop(t) { animT = t; drawBgCanvas(t); draw(t); requestAnimationFrame(loop); }
+
+// ═══════════════════════════════════════════════════
+// INFO
+// ═══════════════════════════════════════════════════
+function updateInfo() {
+  document.getElementById('caseBan').textContent = caseText();
+  const img = compute(), row = document.getElementById('infoRow');
+  if (img.inf) { row.innerHTML = `<div class="chip">Image at <b>∞</b></div>`; return; }
+  const am = Math.abs(img.m);
+  const sz = am > 1.08 ? `Magnified(${am.toFixed(2)}×)` : am < 0.92 ? `Diminished(${am.toFixed(2)}×)` : 'Same Size';
+  row.innerHTML = `
+    <div class="chip">v = <b>${Math.abs(img.v) > 900 ? '∞' : img.v.toFixed(2) + ' cm'}</b></div>
+    <div class="chip">m = <b>${img.m.toFixed(3)}</b></div>
+    <div class="chip">Nature: <b style="color:${img.real ? '#34d399' : '#c084fc'}">${img.real ? 'Real' : 'Virtual'}</b></div>
+    <div class="chip">Size: <b style="color:#60a5fa">${sz}</b></div>
+    <div class="chip">Orientation: <b style="color:${img.m < 0 ? '#f97316' : '#a3e635'}">${img.m < 0 ? 'Inverted' : 'Erect'}</b></div>
+  `;
+}
+function sync() {
+  document.getElementById('fVal').textContent = f.toFixed(1) + ' cm';
+  document.getElementById('uVal').textContent = u.toFixed(1) + ' cm';
+  document.getElementById('fSldr').value = f;
+  document.getElementById('uSldr').value = u;
+  document.getElementById('zoomLbl').textContent = SC.toFixed(1) + ' px/cm';
+  document.getElementById('zoomSldr').value = SC;
+  updateInfo();
+}
+
+// ═══════════════════════════════════════════════════
+// DRAG INTERACTIONS ON CANVAS
+// ═══════════════════════════════════════════════════
+let drag = null, dragX0 = 0, dragVal0 = 0;
+
+function getCanvasX(e) {
+  const r = CV.getBoundingClientRect();
+  const cx = e.touches ? e.touches[0].clientX : e.clientX;
+  return (cx - r.left) * (CW / r.width);
+}
+function hitTest(cx) {
+  const objX = OX - u * SC;
+  if (Math.abs(cx - objX) < 24) return 'obj';
+  if (Math.abs(cx - (OX - f * SC)) < 20) return 'fL';
+  if (!device.includes('mirror') && Math.abs(cx - (OX + f * SC)) < 20) return 'fR';
+  return null;
+}
+function applyDrag(cx) {
+  const delta = (cx - dragX0) / SC;
+  if (drag === 'obj') {
+    u = Math.max(2, Math.min(42, dragVal0 - delta));
+    if (Math.abs(u - f) < 0.22) u = u < f ? f - 0.25 : f + 0.25;
+  } else {
+    const sign = drag === 'fR' ? 1 : -1;
+    f = Math.max(4, Math.min(22, dragVal0 + sign * delta));
+    if (Math.abs(u - f) < 0.22) u = u < f ? f - 0.25 : f + 0.25;
+  }
+  sync();
+}
+
+CV.addEventListener('mousedown', e => {
+  const cx = getCanvasX(e); drag = hitTest(cx);
+  if (drag) { dragX0 = cx; dragVal0 = drag === 'obj' ? u : f; }
+});
+CV.addEventListener('mousemove', e => { if (drag) applyDrag(getCanvasX(e)); });
+CV.addEventListener('mouseup', () => drag = null);
+CV.addEventListener('mouseleave', () => drag = null);
+
+// Touch drag (single finger)
+// Only intercept scroll when a drag handle is hit; otherwise allow native page scroll
+let touchDrag = null, touchDragX0 = 0, touchDragVal0 = 0;
+CV.addEventListener('touchstart', e => {
+  if (e.touches.length > 1) return; // pinch = browser handles
+  const cx = getCanvasX(e);
+  const hit = hitTest(cx);
+  if (hit) {
+    touchDrag = hit;
+    touchDragX0 = cx;
+    touchDragVal0 = touchDrag === 'obj' ? u : f;
+    CV.classList.add('sim-dragging');
+    e.preventDefault(); // only block scroll when on a handle
+  } else {
+    touchDrag = null;
+    CV.classList.remove('sim-dragging');
+    // Do NOT preventDefault → page scrolls normally
+  }
+}, { passive: false });
+CV.addEventListener('touchmove', e => {
+  if (e.touches.length > 1) return;
+  if (!touchDrag) return; // not on handle → scroll handled by browser
+  const cx = getCanvasX(e), delta = (cx - touchDragX0) / SC;
+  if (touchDrag === 'obj') {
+    u = Math.max(2, Math.min(42, touchDragVal0 - delta));
+    if (Math.abs(u - f) < 0.22) u = u < f ? f - 0.25 : f + 0.25;
+  } else {
+    const sign = touchDrag === 'fR' ? 1 : -1;
+    f = Math.max(4, Math.min(22, touchDragVal0 + sign * delta));
+    if (Math.abs(u - f) < 0.22) u = u < f ? f - 0.25 : f + 0.25;
+  }
+  sync(); e.preventDefault();
+}, { passive: false });
+CV.addEventListener('touchend', () => { touchDrag = null; CV.classList.remove('sim-dragging'); });
+CV.addEventListener('touchcancel', () => { touchDrag = null; CV.classList.remove('sim-dragging'); });
+
+// ═══════════════════════════════════════════════════
+// DRAG-AND-DROP FILES
+// Canvas area → object; Outside canvas → background
+// ═══════════════════════════════════════════════════
+const overlay = document.getElementById('dropOverlay');
+const dropLabel = document.getElementById('dropLabel');
+
+function loadImageFromFile(file, asObject) {
+  const r = new FileReader();
+  r.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      if (asObject) { objImg = img; objText = null; document.getElementById('objIn').value = ''; }
+      else bgImg = img;
+    };
+    img.src = ev.target.result;
+  };
+  r.readAsDataURL(file);
+}
+
+function isDropOnCanvas(e) {
+  const r = CV.getBoundingClientRect();
+  const cx = e.clientX, cy = e.clientY;
+  return cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
+}
+
+// Show overlay on drag over page
+let dragCounter = 0;
+document.addEventListener('dragenter', e => {
+  dragCounter++;
+  if ([...e.dataTransfer.items].some(i => i.kind === 'file' && i.type.startsWith('image/'))) {
+    overlay.style.display = 'block'; dropLabel.style.display = 'flex';
+  }
+});
+document.addEventListener('dragleave', () => { dragCounter--; if (dragCounter <= 0) { dragCounter = 0; overlay.style.display = 'none'; dropLabel.style.display = 'none'; } });
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  dragCounter = 0; overlay.style.display = 'none'; dropLabel.style.display = 'none';
+  const file = [...e.dataTransfer.files].find(f => f.type.startsWith('image/'));
+  if (!file) return;
+  const onCanvas = isDropOnCanvas(e);
+  loadImageFromFile(file, onCanvas); // onCanvas=true → object; false → background
+});
+
+// ═══════════════════════════════════════════════════
+// OBJECT URL / TEXT input
+// ═══════════════════════════════════════════════════
+function applyObj() {
+  const val = document.getElementById('objIn').value.trim();
+  if (!val) { objImg = null; objText = null; return; }
+  // If it looks like a URL or data URI → try as image
+  if (val.startsWith('http') || val.startsWith('data:') || val.startsWith('//') || val.startsWith('/') || val.includes('.')) {
+    const img = new Image(); img.crossOrigin = 'anonymous';
+    img.onload = () => { objImg = img; objText = null; };
+    img.onerror = () => {
+      // Fallback: use as text
+      objImg = null; objText = val;
+    };
+    img.src = val;
+  } else {
+    // Treat as text symbol directly
+    objImg = null; objText = val;
+  }
+}
+document.getElementById('objApply').addEventListener('click', applyObj);
+document.getElementById('objIn').addEventListener('keydown', e => { if (e.key === 'Enter') applyObj(); });
+
+// ═══════════════════════════════════════════════════
+// BACKGROUND CONTROLLER
+// ═══════════════════════════════════════════════════
+
+// --- Tab switching ---
+document.querySelectorAll('.bg-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    bgMode = tab.dataset.bm;
+    document.querySelectorAll('.bg-tab').forEach(t => t.classList.remove('on'));
+    tab.classList.add('on');
+    document.querySelectorAll('.bg-panel').forEach(p => p.style.display = 'none');
+    document.getElementById('bgp-' + bgMode).style.display = '';
+    refreshPageBg();
+  });
+});
+
+function refreshPageBg() {
+  BCV.style.display = 'none';
+  if (bgMode === 'solid') {
+    applyPageBg(bgSolid);
+  } else if (bgMode === 'gradient') {
+    const cols = bgGradColors;
+    const stops = cols.map((c,i) => `${c} ${Math.round(i/(Math.max(cols.length-1,1))*100)}%`).join(', ');
+    if (bgGradDir === 'radial') {
+      applyPageBg(`radial-gradient(circle at center, ${stops})`);
+    } else {
+      applyPageBg(`linear-gradient(${bgGradDir}, ${stops})`);
+    }
+  } else if (bgMode === 'image' && !bgImg) {
+    applyPageBg('#07090f');
+  } else if (bgMode === 'animated') {
+    BCV.style.display = 'block';
+    applyPageBg('transparent'); // bgCanvas handles the page bg
+  }
+}
+
+// --- Image/URL ---
+function applyBg() {
+  const val = document.getElementById('bgIn').value.trim();
+  if (!val) { bgImg = null; applyPageBg('#07090f'); return; }
+  const img = new Image(); img.crossOrigin = 'anonymous';
+  img.onload = () => { bgImg = img; applyPageBg(`url('${val}') center/cover no-repeat`); };
+  img.onerror = () => alert('Cannot load background image.');
+  img.src = val;
+}
+document.getElementById('bgApply').addEventListener('click', applyBg);
+document.getElementById('bgIn').addEventListener('keydown', e => { if (e.key === 'Enter') applyBg(); });
+
+// Fill mode
+document.querySelectorAll('#bgp-image .fb').forEach(b => {
+  b.addEventListener('click', () => {
+    bgFill = b.dataset.f;
+    document.querySelectorAll('#bgp-image .fb').forEach(x => x.classList.remove('on')); b.classList.add('on');
+  });
+});
+
+// --- Solid colour ---
+const solidPresets = ['#07090f','#0a0a1a','#0d1b2a','#1a0a0a','#0a1a0a','#1a1200',
+  '#2d1b69','#0c2340','#1a2a1a','#2a1a00','#3b0000','#001a3b','#ffffff','#e8f4f8'];
+const solidPre = document.getElementById('solidPresets');
+solidPresets.forEach(c => {
+  const sw = document.createElement('div');
+  sw.className = 'preset-sw'; sw.style.background = c;
+  sw.title = c;
+  sw.addEventListener('click', () => {
+    bgSolid = c; document.getElementById('solidColor').value = c; refreshPageBg();
+  });
+  solidPre.appendChild(sw);
+});
+document.getElementById('solidApply').addEventListener('click', () => {
+  bgSolid = document.getElementById('solidColor').value;
+  refreshPageBg();
+});
+document.getElementById('solidColor').addEventListener('input', e => {
+  bgSolid = e.target.value; refreshPageBg();
+});
+
+// --- Gradient colours helper ---
+function makeGcRow(container, colorVal, stateArr, idx) {
+  const row = document.createElement('div'); row.className = 'gc-row';
+  const inp = document.createElement('input'); inp.type = 'color'; inp.className = 'gc'; inp.value = colorVal;
+  inp.addEventListener('input', e => { stateArr[idx] = e.target.value; refreshPageBg(); });
+  const del = document.createElement('button'); del.className = 'gc-del'; del.textContent = '×';
+  del.addEventListener('click', () => {
+    if (stateArr.length <= 2) return;
+    stateArr.splice(idx, 1);
+    rebuildGcList(container, stateArr);
+    refreshPageBg();
+  });
+  row.appendChild(inp); row.appendChild(del);
+  container.appendChild(row);
+}
+function rebuildGcList(container, stateArr) {
+  container.innerHTML = '';
+  stateArr.forEach((c, i) => makeGcRow(container, c, stateArr, i));
+}
+
+rebuildGcList(document.getElementById('gradColors'), bgGradColors);
+rebuildGcList(document.getElementById('animColors'), bgAnimColors);
+
+document.getElementById('gradAdd').addEventListener('click', () => {
+  if (bgGradColors.length >= 4) return;
+  bgGradColors.push('#ffffff');
+  rebuildGcList(document.getElementById('gradColors'), bgGradColors);
+});
+document.getElementById('gradApply').addEventListener('click', () => {
+  bgMode = 'gradient'; refreshPageBg();
+});
+
+// Gradient direction buttons
+document.querySelectorAll('#bgp-gradient .fb').forEach(b => {
+  if (!b.dataset.dir) return;
+  b.addEventListener('click', () => {
+    bgGradDir = b.dataset.dir;
+    document.querySelectorAll('#bgp-gradient .fb[data-dir]').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    refreshPageBg();
+  });
+});
+
+// Gradient presets
+const gradPresets = [
+  {label:'Midnight', c:['#0f0c29','#302b63','#24243e']},
+  {label:'Ocean',    c:['#1a2a6c','#b21f1f','#fdbb2d']},
+  {label:'Forest',   c:['#0a3d0a','#1e8c1e','#a8e063']},
+  {label:'Sunset',   c:['#f7971e','#ffd200']},
+  {label:'Aurora',   c:['#00b4db','#0083b0','#00f260','#0575e6']},
+  {label:'Fire',     c:['#f00000','#dc281e','#ff6a00']},
+  {label:'Cosmos',   c:['#0f0c29','#6b11cb','#2575fc']},
+  {label:'Rose',     c:['#f953c6','#b91d73']},
+];
+const gradPre = document.getElementById('gradPresets');
+gradPresets.forEach(p => {
+  const sw = document.createElement('div');
+  sw.className = 'preset-sw';
+  const stops = p.c.map((c,i)=>`${c} ${Math.round(i/(Math.max(p.c.length-1,1))*100)}%`).join(',');
+  sw.style.background = `linear-gradient(135deg,${stops})`;
+  sw.title = p.label;
+  sw.addEventListener('click', () => {
+    bgGradColors = [...p.c];
+    bgMode = 'gradient';
+    document.querySelectorAll('.bg-tab').forEach(t=>t.classList.remove('on'));
+    document.querySelector('.bg-tab[data-bm="gradient"]').classList.add('on');
+    document.querySelectorAll('.bg-panel').forEach(pp=>pp.style.display='none');
+    document.getElementById('bgp-gradient').style.display='';
+    rebuildGcList(document.getElementById('gradColors'), bgGradColors);
+    refreshPageBg();
+  });
+  gradPre.appendChild(sw);
+});
+
+// --- Animated patterns ---
+document.getElementById('animAdd').addEventListener('click', () => {
+  if (bgAnimColors.length >= 4) return;
+  bgAnimColors.push('#f59e0b');
+  rebuildGcList(document.getElementById('animColors'), bgAnimColors);
+});
+document.getElementById('animApply').addEventListener('click', () => {
+  bgMode = 'animated'; refreshPageBg();
+});
+
+const animPatterns = [
+  {id:'orbs',    label:'✦ Orbs'},
+  {id:'wave',    label:'〰 Wave'},
+  {id:'mesh',    label:'⊞ Mesh'},
+  {id:'aurora',  label:'🌌 Aurora'},
+  {id:'spiral',  label:'🌀 Spiral'},
+];
+const animGrid = document.getElementById('animGrid');
+animPatterns.forEach(p => {
+  const btn = document.createElement('button');
+  btn.className = 'anim-btn' + (p.id === bgAnimType ? ' on' : '');
+  btn.textContent = p.label;
+  btn.addEventListener('click', () => {
+    bgAnimType = p.id; bgMode = 'animated';
+    document.querySelectorAll('.anim-btn').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    document.querySelectorAll('.bg-tab').forEach(t => t.classList.remove('on'));
+    document.querySelector('.bg-tab[data-bm="animated"]').classList.add('on');
+    document.querySelectorAll('.bg-panel').forEach(pp => pp.style.display = 'none');
+    document.getElementById('bgp-animated').style.display = '';
+    refreshPageBg();
+  });
+  animGrid.appendChild(btn);
+});
+
+// Also rebuild animColors listeners after init
+document.getElementById('animColors').querySelectorAll('.gc').forEach((inp, i) => {
+  inp.addEventListener('input', e => { bgAnimColors[i] = e.target.value; });
+});
+
+// ═══════════════════════════════════════════════════
+// DEVICE BUTTONS
+// ═══════════════════════════════════════════════════
+document.getElementById('devRow').querySelectorAll('.db').forEach(b => {
+  b.addEventListener('click', () => {
+    device = b.dataset.d;
+    document.querySelectorAll('.db').forEach(x => x.classList.remove('on')); b.classList.add('on');
+    if ((device === 'convex-lens' || device === 'concave-mirror') && Math.abs(u - f) < 0.3) u = f + 0.35;
+    sync();
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// SLIDERS
+// ═══════════════════════════════════════════════════
+document.getElementById('fSldr').addEventListener('input', e => {
+  f = parseFloat(e.target.value);
+  if (Math.abs(u - f) < 0.22) u = u < f ? f - 0.25 : f + 0.25;
+  sync();
+});
+document.getElementById('uSldr').addEventListener('input', e => {
+  u = parseFloat(e.target.value);
+  if (Math.abs(u - f) < 0.22) u = u < f ? f - 0.25 : f + 0.25;
+  sync();
+});
+
+// ═══════════════════════════════════════════════════
+// ZOOM: +/- buttons = SC (scene scale); Pinch = browser native page zoom
+// ═══════════════════════════════════════════════════
+document.getElementById('zoomSldr').addEventListener('input', e => { SC = parseFloat(e.target.value); sync(); });
+document.getElementById('zmIn').addEventListener('click', () => { SC = Math.min(20, parseFloat((SC + 0.5).toFixed(1))); sync(); });
+document.getElementById('zmOut').addEventListener('click', () => { SC = Math.max(4, parseFloat((SC - 0.5).toFixed(1))); sync(); });
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+sync();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
